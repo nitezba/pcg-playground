@@ -1,0 +1,22 @@
+{
+    "world" : {
+        "tile_data" : {
+            "size" : 8
+        },
+        "window_data" : {
+            "tiles_across"  : 240,
+            "tiles_down"    : 160
+        },
+        "map" : {
+
+        },
+        "tile_assets" : {
+            "default" : "blank.png",
+            "wall" : "wall.png",
+            "water" : "water.png"
+        },        
+        "assets" : {
+            
+        }
+    }
+}
