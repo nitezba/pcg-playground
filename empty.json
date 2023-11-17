@@ -4,8 +4,8 @@
             "size" : 8
         },
         "window_data" : {
-            "tiles_across"  : 240,
-            "tiles_down"    : 160
+            "tiles_across"  : 35,
+            "tiles_down"    : 35
         },
         "map" : {
 

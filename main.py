@@ -16,8 +16,10 @@ from pygame.locals import *
 
 # gonna do 30 x 20 resolution here
 pygame.init() 
-WINDOW_WIDTH = 240  # 40 tiles across
-WINDOW_HEIGHT = 160 # 30 tiles down
+# WINDOW_WIDTH = 240  # 40 tiles across
+WINDOW_WIDTH = 200  # 35 tiles across
+WINDOW_HEIGHT = 200 # 35 tiles down
+# WINDOW_HEIGHT = 160 # 30 tiles down
 TILE_SIZE = 8
 
 display_window = pygame.display.set_mode((WINDOW_WIDTH * 4, WINDOW_HEIGHT * 4), 0, 32)
@@ -66,10 +68,12 @@ class Tree:
         self.leaves: list   = leaves
 
 class partitionCell :
-    def __init__(self, topLeft : tuple, bottomRight : tuple) -> None:
-        self.topLeft        = topLeft
-        self.bottomRight    = bottomRight
-        self.children : list= None
+    def __init__(self, topLeft : tuple, bottomRight : tuple, parent = None) -> None:
+        self.topLeft                = topLeft
+        self.bottomRight            = bottomRight
+        self.children : list        = None
+        # can use this to help merge rooms that or too small or post-processing in general
+        self.parent : partitionCell = parent
         # self.isLeaf
 
     # returns tuple of leftmost and rightmost y-values
@@ -155,6 +159,27 @@ class World :
                 
         self.level_number = 0
 
+    def getTileNeighbors(self, coord: tuple) -> dict :
+        tiles = {
+            "top" : {},
+            "middle" : {},
+            "bottom" : {}
+        }
+        
+        tiles["top"]["left"] = (coord[0] - 1, coord[1] - 1) if coord[0] > 0 and coord[1] > 0 else None
+        tiles["top"]["middle"] = (coord[0], coord[1] - 1) if coord[1] > 0 else None
+        tiles["top"]["right"] = (coord[0] + 1, coord[1] - 1) if coord[0] < WINDOW_WIDTH / TILE_SIZE - 1 and coord[1] > 0 else None
+       
+        tiles["middle"]["left"] = (coord[0] - 1, coord[1]) if coord[0] > 0  else None
+        tiles["middle"]["middle"] = None
+        tiles["middle"]["right"] = (coord[0] + 1, coord[1]) if coord[0] < WINDOW_WIDTH / TILE_SIZE - 1 else None
+
+        tiles["bottom"]["left"] = (coord[0] - 1, coord[1] + 1) if coord[0] > 0 and coord[1] < WINDOW_HEIGHT / TILE_SIZE - 1 else None
+        tiles["bottom"]["middle"] = (coord[0], coord[1] + 1) if coord[1] < WINDOW_HEIGHT / TILE_SIZE - 10 else None
+        tiles["bottom"]["right"] = (coord[0] + 1, coord[1] + 1) if coord[0] < WINDOW_WIDTH / TILE_SIZE - 1 and coord[1] < WINDOW_HEIGHT / TILE_SIZE - 1 else None
+         
+        return tiles
+
 # TODO (maybe)
 # it might make more sense to create classes in python and pickle them
 
@@ -197,12 +222,13 @@ class World :
             # TODO: MOVE INTO split FUNCTION
             # split up cell into children 
             node.children = [ # horizontal range -> vertical cut
-                partitionCell(node.topLeft, (spliceLocation, node.bottomRight[1])),
-                partitionCell((spliceLocation + 1, node.topLeft[1]), node.bottomRight)
+                partitionCell(node.topLeft, (spliceLocation, node.bottomRight[1]), node),
+                partitionCell((spliceLocation + 1, node.topLeft[1]), node.bottomRight, node)
             ] if orientation == 0 else [ # vertical range -> horizontal cut
-                partitionCell(node.topLeft, (node.bottomRight[0], spliceLocation)),
-                partitionCell((node.topLeft[0], spliceLocation + 1), node.bottomRight)
+                partitionCell(node.topLeft, (node.bottomRight[0], spliceLocation), node),
+                partitionCell((node.topLeft[0], spliceLocation + 1), node.bottomRight, node)
             ]
+            
             # node.printData()
             tree.append(node)
 
@@ -258,6 +284,59 @@ class World :
             self.spacePartition(cell1, not orientation)
             self.spacePartition(cell2, not orientation)
 
+    # we have:
+        # and n-dimensional grid
+        # a set of states
+        # a set of transition rules
+    def cellularAutomata(self) :
+        # start by sprinkling the world
+        # rocks : list = []
+        spawn_chance = .5
+        neighbor_requirement = 4
+
+        for key in self.tile_map.keys() :
+            place_tile = 1 if random.random() <= spawn_chance else 0
+
+            if place_tile :
+                # rocks.append(key)
+                self.tile_map[key] = 1
+
+        to_remove   : list  = []
+        to_add      : list  = []
+        # then apply propagation rules
+        # a cell turns into rock in the next time step if at least
+        # T (e.g. 5) of its neighbors are rock, otherwise it will turn into free space
+        # NOTE: STORE THE CHANGES THAT NEED TO BE MADE AND THEN MAKE ALL THE REPLACEMENTS
+        # DONT MAKE THE CHANGES AS YOU GO - THIS AFFECTS CURRENT STATE
+        # TODO: this could be made faster by chunking a bit
+        for i in range(3): 
+            for key in self.tile_map.keys() :
+                neighbors = self.getTileNeighbors(key)
+                count = 0
+                # double for loop to check all neighbors
+                for row in neighbors.keys():
+                    for col in neighbors[row].keys() :
+                        neighbor_coord = neighbors[row][col]
+                        
+                        if neighbor_coord != None:
+                            if self.tile_map[neighbor_coord] == 1 :
+                                count += 1
+                if count >= neighbor_requirement :
+                    to_add.append(key)
+                else :
+                    to_remove.append(key)
+
+            for coord in to_add :
+                self.tile_map[coord] = 1
+
+            for coord in to_remove :
+                self.tile_map[coord] = 0
+            
+
+
+
+
+
 # ===============================================================
 frame_start = 0
 frame_end = pygame.time.get_ticks()
@@ -266,11 +345,12 @@ path = None
 
 world = World()
 
-root = partitionCell((0,0), (WINDOW_WIDTH / TILE_SIZE, WINDOW_HEIGHT / TILE_SIZE))
-tree_map : Tree = world.spacePart(root)
-for node in tree_map.leaves:
-    node.printData()
+# root = partitionCell((0,0), (WINDOW_WIDTH / TILE_SIZE, WINDOW_HEIGHT / TILE_SIZE))
+# tree_map : Tree = world.spacePart(root)
+# for node in tree_map.leaves:
+#     node.printData()
 
+world.cellularAutomata()
 
 while playing :
     frame_start = frame_end
@@ -286,10 +366,11 @@ while playing :
                 pygame.quit()
                 sys.exit()
 
-    for leaf in tree_map.leaves : # elt is a partitionNode
-        box : list = leaf.getInternalCoords()
-        for coord in box :
-            world.tile_map[coord] = 1
+    # space partitionining rendering
+    # for leaf in tree_map.leaves : # elt is a partitionNode
+    #     box : list = leaf.getInternalCoords()
+    #     for coord in box :
+    #         world.tile_map[coord] = 1
 
 
     for coord in world.tile_map.keys() :
