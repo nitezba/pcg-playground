@@ -42,12 +42,6 @@ def load_dir(path) :
         images.append(load_image(path + '/' + img_name))
     return images
 
-# expects string (_ , ... , _)
-def tupleFromString(s : str) :
-    new_s = s.replace('(', '')
-    new_s = new_s.replace(')', '')
-    return tuple(map(int, new_s.split(',')))
-
 def stringFromTuple (t : tuple) -> str:
     ret = "("
     for elt in t :
@@ -56,17 +50,20 @@ def stringFromTuple (t : tuple) -> str:
     ret += ")"
     return ret
 
+# base entity class - only used to contain general information about a controllable character
 class Entity :
     def __init__(self, box : pygame.Rect, sprite : pygame.Surface, state : dict ) -> None:
         self.box            = box
         self.sprite         = sprite
         self.state          = state
 
+# SPACE PARTITIONING TREE - just somewhere to put leaves an the whole tree together
 class Tree:
     def __init__(self, tree : list, leaves : list) -> None:
         self.tree : list    = tree
         self.leaves: list   = leaves
 
+# CELL USED IN SPACE PARTITIONING
 class partitionCell :
     def __init__(self, topLeft : tuple, bottomRight : tuple, parent = None) -> None:
         self.topLeft                = topLeft
@@ -183,29 +180,23 @@ class World :
 # TODO (maybe)
 # it might make more sense to create classes in python and pickle them
 
-# question : what's the point of the json if we can just manage it in a dictionary here in python?
-    # maybe json might not be the best for pcg, as we need to generate it, not load it in
-    
-    # maybe we just use json to hold data about obstacles/nontrivial tile types and keep a dict or tiles here
-    
-    # does it make more sense to generate a map from nothing or to overlay the space partitioning on the empty map
-
     # range : area in which we allow the cut to be made
     # orientation : 0 for horizontal (cut will be vertical), 1 for vertical
     def spacePart(self, root : partitionCell) -> Tree: 
-        # might be better to do this as a dictionary instead?
+        # maintains tree structure
         tree = []
+        # populated once we know the froniter is on its last expansion
         leaves = []
+        # used for expansion of the tree
         frontier = []
         frontier.append(root)
-        # ==========================================
+        # =====================================================
         # given an arbitrary leaf node, it is the job of the frontier to create and add it's children to the
         # tree, and in turn update the array of leaf nodes
-        # ==========================================
+        # =====================================================
         while frontier:
             node : partitionCell = frontier[0]
             frontier.remove(frontier[0])
-            # if reached smallest size
             if node.isDonePartitioning() :
                 # skip - NOTE : no tree adding is necessary in this case bc the leaves will already exist in the children of certain nodes
                 leaves.append(node)
@@ -221,68 +212,56 @@ class World :
             
             # TODO: MOVE INTO split FUNCTION
             # split up cell into children 
+            # partitionCell(topLeft, bottomRight, parent)
             node.children = [ # horizontal range -> vertical cut
-                partitionCell(node.topLeft, (spliceLocation, node.bottomRight[1]), node),
-                partitionCell((spliceLocation + 1, node.topLeft[1]), node.bottomRight, node)
+                partitionCell(
+                    node.topLeft, 
+                    (spliceLocation, node.bottomRight[1]), 
+                    node
+                ), partitionCell(
+                    (spliceLocation + 1, node.topLeft[1]), 
+                    node.bottomRight, 
+                    node
+                )
             ] if orientation == 0 else [ # vertical range -> horizontal cut
-                partitionCell(node.topLeft, (node.bottomRight[0], spliceLocation), node),
-                partitionCell((node.topLeft[0], spliceLocation + 1), node.bottomRight, node)
+                partitionCell(
+                    node.topLeft, 
+                    (node.bottomRight[0], spliceLocation), 
+                    node
+                ), partitionCell(
+                    (node.topLeft[0], spliceLocation + 1), 
+                    node.bottomRight, 
+                    node
+                )
             ]
             
-            # node.printData()
             tree.append(node)
 
             frontier.append(node.children[0])
             frontier.append(node.children[1])
 
-            # I THINK THE ISSUE IS HERE, WITH WHAT WE CONSIDER AND HOW WE HANDLE THE BASE CASE
-            # for elt in node.children:
-            #     dims : tuple = elt.getDimensions()
-            #     if dims[0] <= 5 or dims[1] <= 5:
-            #         print("SKIPPPPPPPP")
-            #     else :
-            #         leaves.append(elt)
+        # TODO: check the size of leaf nodes - if too skinny, merge with sister node
+        # i.e. remove these leaves leaving only parents
+        skinnies : list = []
+        for node in leaves:
+            dims : tuple = node.getDimensions()
+            if dims[0] <= 2 or dims [1] <= 2:
+                skinnies.append(node)
+                # print("hey soul sister: VVVVVVVVVV")
+                # node.parent.printData()
+                # print("hey soul sister: ^^^^^^^^^^")
+
+        for node in skinnies :
+            parent = node.parent
+            # NOTE: this probably fucks with the order of leaves?
+            tree.remove(parent)
+            # for child in parent.children:
+            #     leaves.remove(child)
+            parent.children = None
+            leaves.append(parent)
 
         ret = Tree(tree, leaves)
         return ret
-
-
-    def spacePartition(self, cell : partitionCell, orientation : bool) :
-        space = (0,0)
-        # RECURSIVE APPROACH DOES NOT WORK BECAUSE OF HOW IT'LL POPULATE SHIT AS IT WORKS IT'S WAY BACK UP
-        # WE WANT IT TO DO EACH LEVEL OF THE TREE TO COMPLETION AND THEN MOVE DOWN
-
-        # TODO: there's gotta be a simple way to only check orientation once at the start
-            # or not at all
-        if orientation == 0 :
-            space = cell.getHorizontalRange()
-        elif orientation == 1 : 
-            space = cell.getVerticalRange()
-        
-    # extract middle quarter
-        space_size = abs(space[0] - space[1])
-        print(space)
-        # TODO: SECOND CONDITION FEELS V SILLY and i dont fully get why it's needed to begin with tbh
-        # ALSO TODO: BASE THIS ON ONLY ONE OF THE DIMENSIONS (THE SMALLER ONE) INSTEAD
-        if space_size <= 4 or space[0] < space[1]:
-            # self.tile_map[cell.topLeft] = 1
-            # self.tile_map[cell.bottomRight] = 1
-            return
-        else :
-            middle = (space[0] + math.floor(space_size / 4), space[1] - math.floor(space_size / 4))
-            # we'll make the left/top cell inclusive of this, and ofc the bottom one exclusive
-            # print(middle, "h" if not orientation else "v")
-            spliceLocation = random.randrange(middle[0], middle[1])
-            if orientation == 0 : # vertical cut
-                cell1 = partitionCell(cell.topLeft, (spliceLocation, cell.bottomRight[1]))
-                cell2 = partitionCell((spliceLocation + 1, cell.topLeft[1]), cell.bottomRight)
-            elif orientation == 1: # horizontal cut
-                cell1 = partitionCell(cell.topLeft, (cell.bottomRight[0], spliceLocation))
-                cell2 = partitionCell((cell.topLeft[0], spliceLocation + 1), cell.bottomRight)
-
-            # TODO : this is just alternating but it might be better to have random orientation
-            self.spacePartition(cell1, not orientation)
-            self.spacePartition(cell2, not orientation)
 
     # we have:
         # and n-dimensional grid
@@ -332,11 +311,6 @@ class World :
             for coord in to_remove :
                 self.tile_map[coord] = 0
             
-
-
-
-
-
 # ===============================================================
 frame_start = 0
 frame_end = pygame.time.get_ticks()
@@ -345,12 +319,12 @@ path = None
 
 world = World()
 
-# root = partitionCell((0,0), (WINDOW_WIDTH / TILE_SIZE, WINDOW_HEIGHT / TILE_SIZE))
-# tree_map : Tree = world.spacePart(root)
-# for node in tree_map.leaves:
-#     node.printData()
+root = partitionCell((0,0), (WINDOW_WIDTH / TILE_SIZE, WINDOW_HEIGHT / TILE_SIZE))
+tree_map : Tree = world.spacePart(root)
+for node in tree_map.leaves:
+    node.printData()
 
-world.cellularAutomata()
+# world.cellularAutomata()
 
 while playing :
     frame_start = frame_end
@@ -367,10 +341,10 @@ while playing :
                 sys.exit()
 
     # space partitionining rendering
-    # for leaf in tree_map.leaves : # elt is a partitionNode
-    #     box : list = leaf.getInternalCoords()
-    #     for coord in box :
-    #         world.tile_map[coord] = 1
+    for leaf in tree_map.leaves : # elt is a partitionNode
+        box : list = leaf.getInternalCoords()
+        for coord in box :
+            world.tile_map[coord] = 1
 
 
     for coord in world.tile_map.keys() :

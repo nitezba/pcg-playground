@@ -13,7 +13,8 @@
         "tile_assets" : {
             "default" : "blank.png",
             "wall" : "wall.png",
-            "water" : "water.png"
+            "water" : "water.png",
+            "connector" : "connector.png"
         },        
         "assets" : {
             
