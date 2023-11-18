@@ -63,6 +63,43 @@ class Tree:
         self.tree : list    = tree
         self.leaves: list   = leaves
 
+    # should go through the tree and put connections where necessary/possible
+    def connect(self) -> None:
+        # treat it almost like frontier
+        tree_dup : list = self.tree.copy()
+        frontier : list = self.leaves.copy()
+
+
+        # NOTE: WHEN WE FINISH THE BOTTOM LAYER AND CYCLE BACK
+        # AROUND TO FORMER PARENT NODES, THOSE PARENT NODES
+        # DONT HAVE ANY CHILDREN, WHICH IS WHY I THINK THIS FAILS
+        while frontier :
+            node : partitionCell = frontier[0]
+
+            if node.parent == None:
+                break
+            # remove node we're checking, as well as its sibling!!
+
+            # now that we know this node has a parent
+                # obtain the parent
+            parent : partitionCell = node.parent
+                # remove its children from the frontier
+            children : list = parent.children
+
+            for child in children :
+                if child in frontier :
+                    frontier.remove(child)
+                # add the former parent to the frontier
+            frontier.append(parent)
+            print(frontier)
+        
+
+            # identify siblings
+
+            
+            # pop siblings from frontier, add the former parent, establish bridge
+
+
 # CELL USED IN SPACE PARTITIONING
 class partitionCell :
     def __init__(self, topLeft : tuple, bottomRight : tuple, parent = None) -> None:
@@ -122,6 +159,7 @@ class partitionCell :
                 print("topLeft:", node.topLeft, "bottomRight:", node.bottomRight)
         else:
             print("no more")
+        print("Parent Node (topLeft & dimension):" , self.topLeft, self.getDimensions())
         print("==============================")
 
 
@@ -247,16 +285,14 @@ class World :
             dims : tuple = node.getDimensions()
             if dims[0] <= 2 or dims [1] <= 2:
                 skinnies.append(node)
-                # print("hey soul sister: VVVVVVVVVV")
-                # node.parent.printData()
-                # print("hey soul sister: ^^^^^^^^^^")
 
         for node in skinnies :
             parent = node.parent
             # NOTE: this probably fucks with the order of leaves?
+            for child in parent.children:
+                if child in leaves:
+                    leaves.remove(child)
             tree.remove(parent)
-            # for child in parent.children:
-            #     leaves.remove(child)
             parent.children = None
             leaves.append(parent)
 
@@ -267,10 +303,11 @@ class World :
         # and n-dimensional grid
         # a set of states
         # a set of transition rules
-    def cellularAutomata(self) :
+    # area - partitionCell to use the topLeft and bottomRight of the area on which to apply this
+    def cellularAutomata(self, area : partitionCell, spawn_chance : int = .5) :
         # start by sprinkling the world
         # rocks : list = []
-        spawn_chance = .5
+        num_iterations = 3
         neighbor_requirement = 4
 
         for key in self.tile_map.keys() :
@@ -288,8 +325,9 @@ class World :
         # NOTE: STORE THE CHANGES THAT NEED TO BE MADE AND THEN MAKE ALL THE REPLACEMENTS
         # DONT MAKE THE CHANGES AS YOU GO - THIS AFFECTS CURRENT STATE
         # TODO: this could be made faster by chunking a bit
-        for i in range(3): 
-            for key in self.tile_map.keys() :
+        for i in range(num_iterations): # number of iterations that we want to apply
+            # for key in self.tile_map.keys() :
+            for key in area.getInternalCoords() :
                 neighbors = self.getTileNeighbors(key)
                 count = 0
                 # double for loop to check all neighbors
@@ -320,11 +358,12 @@ path = None
 world = World()
 
 root = partitionCell((0,0), (WINDOW_WIDTH / TILE_SIZE, WINDOW_HEIGHT / TILE_SIZE))
-tree_map : Tree = world.spacePart(root)
-for node in tree_map.leaves:
-    node.printData()
+# tree_map : Tree = world.spacePart(root)
+# for node in tree_map.leaves:
+#     node.printData()
 
-# world.cellularAutomata()
+# tree_map.connect()
+world.cellularAutomata(root)
 
 while playing :
     frame_start = frame_end
@@ -341,10 +380,10 @@ while playing :
                 sys.exit()
 
     # space partitionining rendering
-    for leaf in tree_map.leaves : # elt is a partitionNode
-        box : list = leaf.getInternalCoords()
-        for coord in box :
-            world.tile_map[coord] = 1
+    # for leaf in tree_map.leaves : # elt is a partitionNode
+    #     box : list = leaf.getInternalCoords()
+    #     for coord in box :
+    #         world.tile_map[coord] = 1
 
 
     for coord in world.tile_map.keys() :
