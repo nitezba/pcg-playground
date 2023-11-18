@@ -310,11 +310,13 @@ class World :
         num_iterations = 3
         neighbor_requirement = 4
 
-        for key in self.tile_map.keys() :
+        # for key in self.tile_map.keys() :
+        for key in area.getInternalCoords() :
             place_tile = 1 if random.random() <= spawn_chance else 0
 
             if place_tile :
                 # rocks.append(key)
+                # place rock
                 self.tile_map[key] = 1
 
         to_remove   : list  = []
@@ -336,6 +338,7 @@ class World :
                         neighbor_coord = neighbors[row][col]
                         
                         if neighbor_coord != None:
+                            # place rock
                             if self.tile_map[neighbor_coord] == 1 :
                                 count += 1
                 if count >= neighbor_requirement :
