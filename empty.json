@@ -14,7 +14,8 @@
             "default" : "blank.png",
             "wall" : "wall.png",
             "water" : "water.png",
-            "connector" : "connector.png"
+            "connector" : "connector.png",
+            "mountain" : "mountain.png"
         },        
         "assets" : {
             

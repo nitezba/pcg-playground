@@ -220,7 +220,7 @@ class World :
 
     # range : area in which we allow the cut to be made
     # orientation : 0 for horizontal (cut will be vertical), 1 for vertical
-    def spacePart(self, root : partitionCell) -> Tree: 
+    def spacePartition(self, root : partitionCell) -> Tree: 
         # maintains tree structure
         tree = []
         # populated once we know the froniter is on its last expansion
@@ -304,10 +304,12 @@ class World :
         # a set of states
         # a set of transition rules
     # area - partitionCell to use the topLeft and bottomRight of the area on which to apply this
-    def cellularAutomata(self, area : partitionCell, spawn_chance : int = .5) :
+    # asset_place - which kind of cell will get placed by the automata
+    # asset_place - which kind of cell will get left behind by the automata when it decides to kill or ignore something
+    def cellularAutomata(self, area : partitionCell, asset_place : int = 1, asset_ignore : int = 0, spawn_chance : int = .5) :
         # start by sprinkling the world
         # rocks : list = []
-        num_iterations = 3
+        num_iterations = 2
         neighbor_requirement = 4
 
         # for key in self.tile_map.keys() :
@@ -316,8 +318,7 @@ class World :
 
             if place_tile :
                 # rocks.append(key)
-                # place rock
-                self.tile_map[key] = 1
+                self.tile_map[key] = asset_place
 
         to_remove   : list  = []
         to_add      : list  = []
@@ -338,8 +339,7 @@ class World :
                         neighbor_coord = neighbors[row][col]
                         
                         if neighbor_coord != None:
-                            # place rock
-                            if self.tile_map[neighbor_coord] == 1 :
+                            if self.tile_map[neighbor_coord] == asset_place :
                                 count += 1
                 if count >= neighbor_requirement :
                     to_add.append(key)
@@ -347,10 +347,10 @@ class World :
                     to_remove.append(key)
 
             for coord in to_add :
-                self.tile_map[coord] = 1
+                self.tile_map[coord] = asset_place
 
             for coord in to_remove :
-                self.tile_map[coord] = 0
+                self.tile_map[coord] = asset_ignore
             
 # ===============================================================
 frame_start = 0
@@ -361,12 +361,21 @@ path = None
 world = World()
 
 root = partitionCell((0,0), (WINDOW_WIDTH / TILE_SIZE, WINDOW_HEIGHT / TILE_SIZE))
-# tree_map : Tree = world.spacePart(root)
+tree_map : Tree = world.spacePartition(root)
 # for node in tree_map.leaves:
 #     node.printData()
 
+# TODO: DOOINNG THIS - MIX CA WITH BSP
+# space partitionining rendering
+for leaf in tree_map.leaves : # leaf is a partitionNode
+    box : list = leaf.getInternalCoords()
+    for coord in box :
+        world.tile_map[coord] = 1
+
+    world.cellularAutomata(leaf, 2, 1)
+
 # tree_map.connect()
-world.cellularAutomata(root)
+# world.cellularAutomata(root)
 
 while playing :
     frame_start = frame_end
@@ -382,18 +391,14 @@ while playing :
                 pygame.quit()
                 sys.exit()
 
-    # space partitionining rendering
-    # for leaf in tree_map.leaves : # elt is a partitionNode
-    #     box : list = leaf.getInternalCoords()
-    #     for coord in box :
-    #         world.tile_map[coord] = 1
-
-
+    
     for coord in world.tile_map.keys() :
         if world.tile_map[coord] == 0:
             raw_window.blit(world.tile_assets['default'], (TILE_SIZE * coord[0], TILE_SIZE * coord[1]))
         if world.tile_map[coord] == 1:
             raw_window.blit(world.tile_assets['wall'], (TILE_SIZE * coord[0], TILE_SIZE * coord[1]))
+        if world.tile_map[coord] == 2:
+            raw_window.blit(world.tile_assets['mountain'], (TILE_SIZE * coord[0], TILE_SIZE * coord[1]))
 
         
 
