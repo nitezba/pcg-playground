@@ -18,7 +18,7 @@
             "mountain" : "mountain.png"
         },        
         "assets" : {
-            
+            "player" : "player.png"
         }
     }
 }

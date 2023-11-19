@@ -57,6 +57,29 @@ class Entity :
         self.sprite         = sprite
         self.state          = state
 
+    def gridMove(self, grid : list, direction : list = [0,0]) : 
+        valid_move = True
+        next_x = self.box.x + direction[0] * TILE_SIZE
+        next_y = self.box.y + direction[1] * TILE_SIZE
+
+        # bounds check
+        if next_x >= WINDOW_WIDTH or next_x < 0 :
+            valid_move = False
+        if next_y >= WINDOW_HEIGHT or next_y < 0 :
+            valid_move = False
+
+        # wall check
+        # TODO : PROBLEM - EXPOSE THIS TO THE MAP FOR ACCESS
+        next_key = (next_x / TILE_SIZE, next_y / TILE_SIZE)
+        if grid[next_key] == 2:
+            valid_move = False
+
+        if valid_move:
+            self.box.x = next_x
+            self.box.y = next_y
+
+
+
 # SPACE PARTITIONING TREE - just somewhere to put leaves an the whole tree together
 class Tree:
     def __init__(self, tree : list, leaves : list) -> None:
@@ -177,12 +200,16 @@ class World :
         # ========= HANDLE ASSETS =========
         # assets will include things like player sprite, objects, and misc entities. 
         # tiles will be reserved for tile_types
-        self.assets = world["assets"]
         tiles = world["tile_assets"]
+        assets = world["assets"]
         # tile assets handled separately here
         self.tile_assets = {}
+        self.assets = {}
         for key in tiles :
             self.tile_assets[key] = load_image(tiles[key])
+
+        for key in assets :
+            self.assets[key] = load_image(assets[key])
         # ========= HANDLE MAP =========
         # the absence of a coordinate in "map" in the json indicates that it's just a blank tile
         # NOTE : tile_map dict will have raw tuples as keys, while json will have strings of tuples as keys
@@ -377,10 +404,16 @@ for leaf in tree_map.leaves : # leaf is a partitionNode
 # tree_map.connect()
 # world.cellularAutomata(root)
 
+player = Entity(
+    pygame.Rect(0,0,TILE_SIZE,TILE_SIZE),
+    world.assets['player'],
+    {}
+)
+
 while playing :
     frame_start = frame_end
     raw_window.fill((0,0,0))
-
+    player_move_v = [0, 0]
     # event polling
     for event in pygame.event.get() :
         if event.type == QUIT: 
@@ -390,8 +423,17 @@ while playing :
             if event.key == K_ESCAPE:
                 pygame.quit()
                 sys.exit()
+            if event.key == K_w:
+                player_move_v = [0,-1]
+            if event.key == K_a:
+                player_move_v = [-1,0]
+            if event.key == K_s:
+                player_move_v = [0,1]
+            if event.key == K_d:
+                player_move_v = [1,0]
 
-    
+    player.gridMove(world.tile_map, player_move_v)
+    # world rendering
     for coord in world.tile_map.keys() :
         if world.tile_map[coord] == 0:
             raw_window.blit(world.tile_assets['default'], (TILE_SIZE * coord[0], TILE_SIZE * coord[1]))
@@ -400,7 +442,8 @@ while playing :
         if world.tile_map[coord] == 2:
             raw_window.blit(world.tile_assets['mountain'], (TILE_SIZE * coord[0], TILE_SIZE * coord[1]))
 
-        
+    # player rendering
+    raw_window.blit(world.assets['player'], player.box)
 
     scaled_window = pygame.transform.scale(raw_window, display_window.get_size())
     display_window.blit(scaled_window, (0,0))
