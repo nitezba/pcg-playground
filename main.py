@@ -57,7 +57,8 @@ class Entity :
         self.sprite         = sprite
         self.state          = state
 
-    def gridMove(self, grid : list, direction : list = [0,0]) : 
+    # delta will be how long we want a step to take
+    def gridMove(self, grid : dict, delta_time : int, direction : list = [0,0]) : 
         valid_move = True
         next_x = self.box.x + direction[0] * TILE_SIZE
         next_y = self.box.y + direction[1] * TILE_SIZE
@@ -71,12 +72,47 @@ class Entity :
         # wall check
         # TODO : PROBLEM - EXPOSE THIS TO THE MAP FOR ACCESS
         next_key = (next_x / TILE_SIZE, next_y / TILE_SIZE)
+
         if grid[next_key] == 2:
             valid_move = False
 
         if valid_move:
             self.box.x = next_x
             self.box.y = next_y
+            # TODO : SMOOTH OUT THIS MOVEMENT
+            # start = pygame.time.get_ticks()
+            # end = start + delta_time
+            # # smooth the transition from one to the next
+            # delta_pos_x = next_x - self.box.x
+            # step_length_x = delta_pos_x / delta_time
+
+            # delta_pos_y = next_x - self.box.y
+            # step_length_y = delta_pos_y / delta_time
+
+            # # question - how much do we need to add each frame so that it'll take exactly delta_time to traverse
+            # # delta_pos_X
+            # if self.box.x != next_x :
+            #     while pygame.time.get_ticks() < end :
+            #         self.box.x += step_length_x
+
+            # if self.box.y != next_y :
+            #     while pygame.time.get_ticks() < end :
+            #         self.box.y += step_length_y
+
+
+        
+    # the main purpose of handleAnimation will be to set the animation flag which dictates if we can take in more
+    # input or not
+    # start_time will get input from getTicks, thus being time in ms
+    def handleAnimation(self, animaton : list, start_time : int, anim_duration : int) :
+        if start_time < 0 :
+            return
+        
+        delta = pygame.time.get_ticks() - start_time
+        if delta < anim_duration :
+            self.state['is_animating'] = True
+        else :
+            self.state['is_animating'] = False
 
 
 
@@ -407,14 +443,19 @@ for leaf in tree_map.leaves : # leaf is a partitionNode
 player = Entity(
     pygame.Rect(0,0,TILE_SIZE,TILE_SIZE),
     world.assets['player'],
-    {}
+    {
+        'is_animating' : False
+    }
 )
+input_time = -1
 
 while playing :
     frame_start = frame_end
     raw_window.fill((0,0,0))
     player_move_v = [0, 0]
-    # event polling
+
+
+    # single keypress event polling
     for event in pygame.event.get() :
         if event.type == QUIT: 
             pygame.quit()
@@ -423,16 +464,41 @@ while playing :
             if event.key == K_ESCAPE:
                 pygame.quit()
                 sys.exit()
-            if event.key == K_w:
-                player_move_v = [0,-1]
-            if event.key == K_a:
-                player_move_v = [-1,0]
-            if event.key == K_s:
-                player_move_v = [0,1]
-            if event.key == K_d:
-                player_move_v = [1,0]
+            # if event.key == K_w:
+            #     player_move_v = [0,-1]
+            # if event.key == K_a:
+            #     player_move_v = [-1,0]
+            # if event.key == K_s:
+            #     player_move_v = [0,1]
+            # if event.key == K_d:
+            #     player_move_v = [1,0]
 
-    player.gridMove(world.tile_map, player_move_v)
+    # key held down event polling
+    keys = pygame.key.get_pressed()
+    # IGNORE THIS INPUT IF MOVEMENT ANIMATION IS TAKING PLACE
+
+    if not player.state['is_animating'] :
+        if keys[pygame.K_w]:
+            input_time = pygame.time.get_ticks()
+            player_move_v = [0,-1]
+            player.sprite = world.assets['walk_up']
+        if keys[pygame.K_a]:
+            input_time = pygame.time.get_ticks()
+            player_move_v = [-1,0]
+            player.sprite = world.assets['walk_left']
+        if keys[pygame.K_s]:
+            input_time = pygame.time.get_ticks()
+            player_move_v = [0,1]
+            player.sprite = world.assets['walk_down']
+        if keys[pygame.K_d]:
+            input_time = pygame.time.get_ticks()
+            player_move_v = [1,0]
+            player.sprite = world.assets['walk_right']
+
+    step_duration = 300
+    player.gridMove(world.tile_map, step_duration, player_move_v)
+    player.handleAnimation(None, input_time, step_duration)
+
     # world rendering
     for coord in world.tile_map.keys() :
         if world.tile_map[coord] == 0:
@@ -443,7 +509,10 @@ while playing :
             raw_window.blit(world.tile_assets['mountain'], (TILE_SIZE * coord[0], TILE_SIZE * coord[1]))
 
     # player rendering
-    raw_window.blit(world.assets['player'], player.box)
+    if not player.state['is_animating'] :
+        player.sprite = world.assets['player']
+        
+    raw_window.blit(player.sprite, player.box)
 
     scaled_window = pygame.transform.scale(raw_window, display_window.get_size())
     display_window.blit(scaled_window, (0,0))

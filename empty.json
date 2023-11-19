@@ -18,7 +18,11 @@
             "mountain" : "mountain.png"
         },        
         "assets" : {
-            "player" : "player.png"
+            "player"        : "player.png",
+            "walk_left"     : "walk_left.png",
+            "walk_right"    : "walk_right.png",
+            "walk_up"       : "walk_up.png",
+            "walk_down"     : "walk_down.png"
         }
     }
 }
